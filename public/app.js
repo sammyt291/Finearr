@@ -45,6 +45,7 @@ const profile = document.getElementById('profile');
 const appRoot = document.getElementById('app');
 const loginScreen = document.getElementById('loginScreen');
 const loginStatus = document.getElementById('loginStatus');
+const carouselButtons = document.querySelectorAll('.carousel-nav');
 
 let appConfig = {};
 
@@ -148,6 +149,55 @@ navButtons.forEach((button) => {
 
 function renderProfile() {
   profile.textContent = state.user ? `Signed in as ${state.user.username}` : 'Not logged in';
+}
+
+function updateCarouselButtonState(carousel, buttons) {
+  if (!carousel) return;
+  const maxScrollLeft = carousel.scrollWidth - carousel.clientWidth;
+  buttons.forEach((button) => {
+    if (button.classList.contains('prev')) {
+      button.disabled = carousel.scrollLeft <= 1;
+      return;
+    }
+    if (button.classList.contains('next')) {
+      button.disabled = carousel.scrollLeft >= maxScrollLeft - 1;
+    }
+  });
+}
+
+function refreshCarouselButtons(container) {
+  if (!container?.id) return;
+  const buttons = Array.from(
+    document.querySelectorAll(`.carousel-nav[data-target="${container.id}"]`)
+  );
+  if (!buttons.length) return;
+  updateCarouselButtonState(container, buttons);
+}
+
+function setupCarouselControls() {
+  const groupedButtons = new Map();
+  carouselButtons.forEach((button) => {
+    const targetId = button.dataset.target;
+    if (!targetId) return;
+    if (!groupedButtons.has(targetId)) {
+      groupedButtons.set(targetId, []);
+    }
+    groupedButtons.get(targetId).push(button);
+    button.addEventListener('click', () => {
+      const carousel = document.getElementById(targetId);
+      if (!carousel) return;
+      const direction = button.classList.contains('prev') ? -1 : 1;
+      carousel.scrollBy({ left: direction * carousel.clientWidth, behavior: 'smooth' });
+    });
+  });
+  groupedButtons.forEach((buttons, targetId) => {
+    const carousel = document.getElementById(targetId);
+    if (!carousel) return;
+    const updateState = () => updateCarouselButtonState(carousel, buttons);
+    carousel.addEventListener('scroll', updateState);
+    window.addEventListener('resize', updateState);
+    updateState();
+  });
 }
 
 function setAdminVisibility(isAdmin) {
@@ -396,6 +446,7 @@ function renderCards(container, items, { append = false, emptyMessage } = {}) {
   }
   if (!items.length && !append) {
     container.innerHTML = `<p>${emptyMessage || 'No results yet. Try a search.'}</p>`;
+    refreshCarouselButtons(container);
     return;
   }
   items.forEach((item) => {
@@ -436,6 +487,7 @@ function renderCards(container, items, { append = false, emptyMessage } = {}) {
     card.querySelector('.request').addEventListener('click', () => requestItem(item));
     container.appendChild(card);
   });
+  refreshCarouselButtons(container);
 }
 
 async function requestItem(item) {
@@ -699,6 +751,7 @@ document.querySelectorAll('.tab').forEach((tab) => {
   setAdminVisibility(false);
   updatePlexLoginButtons();
   updateAdminLoginButton();
+  setupCarouselControls();
   await loadAppConfig();
   const loggedIn = await autoLogin();
   if (!loggedIn) {

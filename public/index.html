@@ -41,13 +41,29 @@
         <section id="viewContainer">
           <div id="homeView" class="view active">
             <h2>Fresh UK / US Releases</h2>
-            <div id="recentList" class="card-carousel" aria-live="polite"></div>
+            <div class="carousel-shell">
+              <button class="carousel-nav prev" type="button" data-target="recentList" aria-label="Previous cards">
+                ‹
+              </button>
+              <div id="recentList" class="card-carousel" aria-live="polite"></div>
+              <button class="carousel-nav next" type="button" data-target="recentList" aria-label="Next cards">
+                ›
+              </button>
+            </div>
             <h2>Most Recent Approvals</h2>
             <div id="approvalList" class="card-grid"></div>
           </div>
           <div id="searchView" class="view">
             <h2>Search Results</h2>
-            <div id="resultsList" class="card-carousel" aria-live="polite"></div>
+            <div class="carousel-shell">
+              <button class="carousel-nav prev" type="button" data-target="resultsList" aria-label="Previous cards">
+                ‹
+              </button>
+              <div id="resultsList" class="card-carousel" aria-live="polite"></div>
+              <button class="carousel-nav next" type="button" data-target="resultsList" aria-label="Next cards">
+                ›
+              </button>
+            </div>
           </div>
           <div id="requestsView" class="view">
             <h2>Requests</h2>
