@@ -6,7 +6,11 @@ const state = {
   permissions: null,
   approvals: [],
   requests: { movies: [], shows: [] },
-  blacklist: { movies: [], shows: [] }
+  blacklist: { movies: [], shows: [] },
+  recentItems: [],
+  recentPage: 0,
+  recentLoading: false,
+  recentHasMore: true
 };
 
 const views = {
@@ -47,6 +51,54 @@ const adminList = document.getElementById('adminList');
 const newAdminUser = document.getElementById('newAdminUser');
 const newAdminPass = document.getElementById('newAdminPass');
 const createAdmin = document.getElementById('createAdmin');
+
+const imageCacheKey = 'finearrImageCache';
+const placeholderPoster = 'https://placehold.co/120x180';
+let imageCache = loadImageCache();
+
+function loadImageCache() {
+  try {
+    const stored = localStorage.getItem(imageCacheKey);
+    return stored ? JSON.parse(stored) : {};
+  } catch (error) {
+    return {};
+  }
+}
+
+function saveImageCache() {
+  try {
+    localStorage.setItem(imageCacheKey, JSON.stringify(imageCache));
+  } catch (error) {
+    // Ignore storage errors.
+  }
+}
+
+function getCachedPoster(item) {
+  if (!item?.id) return null;
+  return imageCache[item.id] || null;
+}
+
+function rememberPoster(item, url) {
+  if (!item?.id || !url || imageCache[item.id] === url) return;
+  imageCache[item.id] = url;
+  saveImageCache();
+}
+
+function formatActors(actors = []) {
+  if (!actors.length) return 'Actors: Not available';
+  return `Actors: ${actors.slice(0, 5).join(', ')}`;
+}
+
+function buildDetailsLinks(item) {
+  const links = [];
+  if (item.imdb) {
+    links.push(`<a href="${item.imdb}" target="_blank" rel="noreferrer">IMDB</a>`);
+  }
+  if (item.tvdb) {
+    links.push(`<a href="${item.tvdb}" target="_blank" rel="noreferrer">TVDB</a>`);
+  }
+  return links.length ? links.join('') : '<span class="card-meta">No external links.</span>';
+}
 
 function showLoginScreen(shouldShow) {
   loginScreen.classList.toggle('active', shouldShow);
@@ -258,29 +310,41 @@ searchButton.addEventListener('click', async () => {
   if (!query) return;
   const response = await fetch(`/api/search?query=${encodeURIComponent(query)}`);
   const data = await response.json();
-  renderCards(resultsList, [...data.movies, ...data.shows]);
+  renderCards(resultsList, [...data.movies, ...data.shows], {
+    emptyMessage: 'No results found for your search.'
+  });
   setActiveView('search');
 });
 
-function renderCards(container, items) {
-  container.innerHTML = '';
-  if (!items.length) {
-    container.innerHTML = '<p>No results yet. Try a search.</p>';
+function renderCards(container, items, { append = false, emptyMessage } = {}) {
+  if (!append) {
+    container.innerHTML = '';
+  }
+  if (!items.length && !append) {
+    container.innerHTML = `<p>${emptyMessage || 'No results yet. Try a search.'}</p>`;
     return;
   }
   items.forEach((item) => {
+    const cachedPoster = getCachedPoster(item);
+    const posterUrl = cachedPoster || item.poster || placeholderPoster;
+    if (!cachedPoster && item.poster) {
+      rememberPoster(item, item.poster);
+    }
     const card = document.createElement('div');
     card.className = 'card';
     card.innerHTML = `
-      <img src="${item.poster || 'https://placehold.co/300x450'}" alt="${item.title}" />
+      <div class="card-header">
+        <img class="card-thumb" src="${posterUrl}" alt="${item.title}" loading="lazy" />
+        <div class="card-header-info">
+          <div class="card-title">${item.title}</div>
+          <div class="card-meta">Year: ${item.year || '—'}</div>
+          <div class="card-meta">${formatActors(item.actors)}</div>
+        </div>
+      </div>
       <div class="card-body">
-        <div class="card-title">${item.title}</div>
-        <div class="card-meta">${item.year || ''}</div>
-        <div class="card-meta">${(item.actors || []).slice(0, 5).join(', ')}</div>
         <div class="card-details">
-          <p>${item.plot || ''}</p>
-          ${item.imdb ? `<a href="${item.imdb}" target="_blank">IMDB</a>` : ''}
-          ${item.tvdb ? `<a href="${item.tvdb}" target="_blank">TVDB</a>` : ''}
+          <p>${item.plot ? item.plot : 'No synopsis available yet.'}</p>
+          <div class="card-links">${buildDetailsLinks(item)}</div>
         </div>
         <div class="card-actions">
           <button class="secondary toggle">Details</button>
@@ -288,6 +352,10 @@ function renderCards(container, items) {
         </div>
       </div>
     `;
+    const imageEl = card.querySelector('.card-thumb');
+    imageEl.addEventListener('error', () => {
+      imageEl.src = placeholderPoster;
+    });
     card.querySelector('.toggle').addEventListener('click', () => {
       card.classList.toggle('expanded');
     });
@@ -494,11 +562,53 @@ function renderBlacklist() {
 
 blacklistSearch.addEventListener('input', renderBlacklist);
 
+recentList.addEventListener('scroll', () => {
+  const nearEnd = recentList.scrollLeft + recentList.clientWidth >= recentList.scrollWidth - 40;
+  if (nearEnd) {
+    loadMoreRecent();
+  }
+});
+
+async function fetchRecentPage(page = 0) {
+  const response = await fetch(`/api/home/recent?page=${page}`);
+  if (!response.ok) {
+    return null;
+  }
+  return response.json();
+}
+
+async function loadMoreRecent() {
+  if (state.recentLoading || !state.recentHasMore) return;
+  state.recentLoading = true;
+  const nextPage = state.recentPage + 1;
+  const data = await fetchRecentPage(nextPage);
+  const nextItems = data?.recent || [];
+  if (!nextItems.length) {
+    state.recentHasMore = false;
+    state.recentLoading = false;
+    return;
+  }
+  const knownIds = new Set(state.recentItems.map((item) => item.id));
+  const newItems = nextItems.filter((item) => !knownIds.has(item.id));
+  if (!newItems.length) {
+    state.recentHasMore = false;
+    state.recentLoading = false;
+    return;
+  }
+  state.recentItems = [...state.recentItems, ...newItems];
+  state.recentPage = nextPage;
+  renderCards(recentList, newItems, { append: true });
+  state.recentLoading = false;
+}
+
 async function loadHome() {
-  const response = await fetch('/api/home/recent');
-  const data = await response.json();
-  renderCards(recentList, data.recent);
-  renderCards(approvalList, data.approvals || []);
+  state.recentPage = 0;
+  state.recentHasMore = true;
+  const data = await fetchRecentPage(0);
+  if (!data) return;
+  state.recentItems = data.recent || [];
+  renderCards(recentList, state.recentItems, { emptyMessage: 'No recent releases yet.' });
+  renderCards(approvalList, data.approvals || [], { emptyMessage: 'No approvals yet.' });
 }
 
 document.querySelectorAll('.tab').forEach((tab) => {

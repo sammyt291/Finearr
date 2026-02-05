@@ -268,8 +268,13 @@ function createApp(state) {
     res.json(results);
   });
 
-  app.get('/api/home/recent', async (_req, res) => {
-    const items = await loadRecentItems();
+  app.get('/api/home/recent', async (req, res) => {
+    const page = Number.parseInt(req.query.page ?? '0', 10);
+    const limit = Number.parseInt(req.query.limit ?? '20', 10);
+    const items = await loadRecentItems({
+      page: Number.isNaN(page) ? 0 : page,
+      limit: Number.isNaN(limit) ? 20 : limit
+    });
     res.json(items);
   });
 
@@ -455,17 +460,25 @@ async function fetchImdbApi(pathname) {
   }
 }
 
-async function loadRecentItems() {
+async function loadRecentItems({ page = 0, limit = 20 } = {}) {
+  const pageParam = Number.isFinite(page) ? page + 1 : 1;
+  const limitParam = Number.isFinite(limit) ? limit : 20;
   const data = await fetchImdbApi(
-    '/titles?types=MOVIE&sortBy=SORT_BY_RELEASE_DATE&sortOrder=DESC'
+    `/titles?types=MOVIE&sortBy=SORT_BY_RELEASE_DATE&sortOrder=DESC&page=${pageParam}&limit=${limitParam}`
   );
-  const recent = (data?.titles || []).slice(0, 20).map((item) => ({
+  const recent = (data?.titles || []).slice(0, limitParam).map((item) => ({
     id: item.id,
     title: item.primaryTitle || item.originalTitle,
     year: item.startYear,
-    poster: item.primaryImage?.url
+    poster: item.primaryImage?.url,
+    actors: [],
+    imdb: item.id ? `https://www.imdb.com/title/${item.id}` : null
   }));
-  return { recent, approvals: await loadData('approvals') };
+  const payload = { recent };
+  if (page === 0) {
+    payload.approvals = await loadData('approvals');
+  }
+  return payload;
 }
 
 async function sendToDownloader(type, item) {
