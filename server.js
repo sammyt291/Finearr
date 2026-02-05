@@ -74,6 +74,18 @@ function buildPlexHeaders(config) {
 
 function createApp(state) {
   const app = express();
+  const adminSessions = state.adminSessions ?? new Map();
+  state.adminSessions = adminSessions;
+
+  const requireAdmin = (req, res, next) => {
+    const token = req.get('X-Admin-Token');
+    if (!token || !adminSessions.has(token)) {
+      return res.status(401).json({ error: 'Admin authentication required' });
+    }
+    req.admin = adminSessions.get(token);
+    next();
+  };
+
   app.use(express.json());
   app.use(express.static(path.join(__dirname, 'public')));
 
@@ -181,15 +193,17 @@ function createApp(state) {
     if (!admin) {
       return res.status(401).json({ error: 'Invalid admin credentials' });
     }
-    res.json({ admin: { username: admin.username } });
+    const token = `admin_${Math.random().toString(36).slice(2)}`;
+    adminSessions.set(token, { username: admin.username, issuedAt: Date.now() });
+    res.json({ admin: { username: admin.username }, token });
   });
 
-  app.get('/api/admin/accounts', async (_req, res) => {
+  app.get('/api/admin/accounts', requireAdmin, async (_req, res) => {
     const admins = await loadData('admins');
     res.json({ admins: admins.map((entry) => ({ username: entry.username })) });
   });
 
-  app.post('/api/admin/accounts', async (req, res) => {
+  app.post('/api/admin/accounts', requireAdmin, async (req, res) => {
     const { username, password } = req.body;
     if (!username || !password) {
       return res.status(400).json({ error: 'Missing username or password' });
@@ -203,7 +217,7 @@ function createApp(state) {
     res.json({ admins: admins.map((entry) => ({ username: entry.username })) });
   });
 
-  app.put('/api/admin/accounts/:username', async (req, res) => {
+  app.put('/api/admin/accounts/:username', requireAdmin, async (req, res) => {
     const { username } = req.params;
     const { password } = req.body;
     const admins = await loadData('admins');
@@ -216,7 +230,7 @@ function createApp(state) {
     res.json({ admins: admins.map((entry) => ({ username: entry.username })) });
   });
 
-  app.delete('/api/admin/accounts/:username', async (req, res) => {
+  app.delete('/api/admin/accounts/:username', requireAdmin, async (req, res) => {
     const { username } = req.params;
     if (username === 'admin') {
       return res.status(400).json({ error: 'Default admin cannot be deleted' });
@@ -227,12 +241,12 @@ function createApp(state) {
     res.json({ admins: filtered.map((entry) => ({ username: entry.username })) });
   });
 
-  app.get('/api/permissions', async (_req, res) => {
+  app.get('/api/permissions', requireAdmin, async (_req, res) => {
     const permissions = await loadData('permissions');
     res.json(permissions);
   });
 
-  app.put('/api/permissions', async (req, res) => {
+  app.put('/api/permissions', requireAdmin, async (req, res) => {
     const permissions = await loadData('permissions');
     const { defaults: defaultPerms, users } = req.body;
     if (defaultPerms) {
@@ -259,7 +273,7 @@ function createApp(state) {
     res.json(items);
   });
 
-  app.get('/api/requests', async (_req, res) => {
+  app.get('/api/requests', requireAdmin, async (_req, res) => {
     const requests = await loadData('requests');
     const approvals = await loadData('approvals');
     const blacklist = await loadData('blacklist');
@@ -298,7 +312,7 @@ function createApp(state) {
     res.json({ status: 'pending', entry });
   });
 
-  app.post('/api/requests/:type/:id/approve', async (req, res) => {
+  app.post('/api/requests/:type/:id/approve', requireAdmin, async (req, res) => {
     const { type, id } = req.params;
     const requests = await loadData('requests');
     const approvals = await loadData('approvals');
@@ -315,7 +329,7 @@ function createApp(state) {
     res.json({ status: 'approved', entry });
   });
 
-  app.post('/api/requests/:type/:id/deny', async (req, res) => {
+  app.post('/api/requests/:type/:id/deny', requireAdmin, async (req, res) => {
     const { type, id } = req.params;
     const requests = await loadData('requests');
     const blacklist = await loadData('blacklist');
@@ -335,7 +349,7 @@ function createApp(state) {
     res.json({ status: 'denied', entry });
   });
 
-  app.delete('/api/blacklist/:type/:id', async (req, res) => {
+  app.delete('/api/blacklist/:type/:id', requireAdmin, async (req, res) => {
     const { type, id } = req.params;
     const blacklist = await loadData('blacklist');
     const listKey = type === 'movie' ? 'movies' : 'shows';
