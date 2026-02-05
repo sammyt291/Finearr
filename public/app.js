@@ -223,7 +223,7 @@ searchButton.addEventListener('click', async () => {
 function renderCards(container, items) {
   container.innerHTML = '';
   if (!items.length) {
-    container.innerHTML = '<p>No results yet. Add API keys in config.json.</p>';
+    container.innerHTML = '<p>No results yet. Try a search.</p>';
     return;
   }
   items.forEach((item) => {

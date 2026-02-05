@@ -12,6 +12,7 @@ const __dirname = path.dirname(__filename);
 
 const configPath = path.join(__dirname, 'config.json');
 const dataDir = path.join(__dirname, 'data');
+const imdbApiBaseUrl = 'https://api.imdbapi.dev';
 
 const defaults = {
   admins: [{ username: 'admin', password: 'admin' }],
@@ -249,14 +250,12 @@ function createApp(state) {
     if (!query) {
       return res.status(400).json({ error: 'Missing query' });
     }
-    const config = await loadConfig();
-    const results = await searchMedia(config, query.toString());
+    const results = await searchMedia(query.toString());
     res.json(results);
   });
 
   app.get('/api/home/recent', async (_req, res) => {
-    const config = await loadConfig();
-    const items = await loadRecentItems(config);
+    const items = await loadRecentItems();
     res.json(items);
   });
 
@@ -375,83 +374,82 @@ async function validatePlexToken(config, plexToken) {
   return { id: data.id?.toString(), username: data.username || data.email };
 }
 
-async function searchMedia(config, query) {
-  const omdbResults = await searchOmdb(config, query);
-  const tvdbResults = await searchTvdb(config, query);
+async function searchMedia(query) {
+  const imdbResults = await searchImdb(query);
   return {
     query,
-    movies: omdbResults,
-    shows: tvdbResults
+    movies: imdbResults.movies,
+    shows: imdbResults.shows
   };
 }
 
-async function searchOmdb(config, query) {
-  if (!config.omdb.apiKey) {
-    return [];
-  }
-  const response = await fetch(`https://www.omdbapi.com/?apikey=${config.omdb.apiKey}&s=${encodeURIComponent(query)}&type=movie`);
-  if (!response.ok) {
-    return [];
-  }
-  const data = await response.json();
-  if (!data.Search) {
-    return [];
-  }
+async function searchImdb(query) {
+  const data = await fetchImdbApi(`/search/titles?query=${encodeURIComponent(query)}&limit=20`);
+  const titles = data?.titles ?? [];
+  const movieTypes = new Set(['MOVIE', 'movie']);
+  const showTypes = new Set(['TV_SERIES', 'TV_MINI_SERIES', 'TV_SPECIAL', 'TV_MOVIE', 'tvSeries', 'tvMiniSeries', 'tvSpecial', 'tvMovie']);
+  const movies = titles.filter((title) => movieTypes.has(title.type)).slice(0, 10);
+  const shows = titles.filter((title) => showTypes.has(title.type)).slice(0, 10);
+  return {
+    movies: await buildImdbResults(movies, 'movie'),
+    shows: await buildImdbResults(shows, 'show')
+  };
+}
+
+async function buildImdbResults(titles, type) {
   return Promise.all(
-    data.Search.map(async (item) => {
-      const detailResponse = await fetch(`https://www.omdbapi.com/?apikey=${config.omdb.apiKey}&i=${item.imdbID}`);
-      const detail = await detailResponse.json();
-      const actors = detail.Actors ? detail.Actors.split(',').slice(0, 5) : [];
+    titles.map(async (title) => {
+      const actors = await fetchImdbActors(title.id);
       return {
-        id: item.imdbID,
-        title: item.Title,
-        year: item.Year,
-        poster: item.Poster,
-        plot: detail.Plot,
+        id: title.id,
+        title: title.primaryTitle || title.originalTitle,
+        year: title.startYear,
+        poster: title.primaryImage?.url,
+        plot: title.plot,
         actors,
-        imdb: `https://www.imdb.com/title/${item.imdbID}`,
-        type: 'movie'
+        imdb: title.id ? `https://www.imdb.com/title/${title.id}` : null,
+        type
       };
     })
   );
 }
 
-async function searchTvdb(config, query) {
-  if (!config.tvdb.apiKey) {
+async function fetchImdbActors(titleId) {
+  if (!titleId) {
     return [];
   }
-  const response = await fetch(`https://api4.thetvdb.com/v4/search?query=${encodeURIComponent(query)}&type=series`, {
-    headers: {
-      Authorization: `Bearer ${config.tvdb.apiKey}`
-    }
-  });
-  if (!response.ok) {
-    return [];
-  }
-  const data = await response.json();
-  return (data.data || []).slice(0, 10).map((item) => ({
-    id: item.tvdb_id?.toString() || item.id?.toString(),
-    title: item.name,
-    year: item.year,
-    poster: item.image_url,
-    plot: item.overview,
-    actors: [],
-    tvdb: `https://thetvdb.com/series/${item.slug}`,
-    type: 'show'
-  }));
+  const data = await fetchImdbApi(
+    `/titles/${encodeURIComponent(titleId)}/credits?categories=actor&categories=actress&pageSize=5`
+  );
+  return (data?.credits || [])
+    .map((credit) => credit.name?.displayName)
+    .filter(Boolean)
+    .slice(0, 5);
 }
 
-async function loadRecentItems(config) {
-  if (!config.omdb.apiKey) {
-    return { recent: [], approvals: await loadData('approvals') };
+async function fetchImdbApi(pathname) {
+  try {
+    const response = await fetch(`${imdbApiBaseUrl}${pathname}`, {
+      headers: { Accept: 'application/json' }
+    });
+    if (!response.ok) {
+      return null;
+    }
+    return await response.json();
+  } catch (error) {
+    return null;
   }
-  const response = await fetch(`https://www.omdbapi.com/?apikey=${config.omdb.apiKey}&s=2024&type=movie`);
-  const data = await response.json();
-  const recent = (data.Search || []).slice(0, 20).map((item) => ({
-    id: item.imdbID,
-    title: item.Title,
-    year: item.Year,
-    poster: item.Poster
+}
+
+async function loadRecentItems() {
+  const data = await fetchImdbApi(
+    '/titles?types=MOVIE&sortBy=SORT_BY_RELEASE_DATE&sortOrder=DESC'
+  );
+  const recent = (data?.titles || []).slice(0, 20).map((item) => ({
+    id: item.id,
+    title: item.primaryTitle || item.originalTitle,
+    year: item.startYear,
+    poster: item.primaryImage?.url
   }));
   return { recent, approvals: await loadData('approvals') };
 }
