@@ -187,7 +187,9 @@ button {
   overflow-x: auto;
   padding-bottom: 12px;
   scroll-snap-type: x mandatory;
-  margin-bottom: 32px;
+  margin-bottom: 0;
+  width: min(100%, calc(var(--card-max, 6) * var(--card-width, 240px) + (var(--card-max, 6) - 1) * var(--card-gap, 18px)));
+  scroll-behavior: smooth;
 }
 
 .card-carousel::-webkit-scrollbar {
@@ -209,6 +211,43 @@ button {
   flex-direction: column;
   width: 240px;
   scroll-snap-align: start;
+}
+
+.carousel-shell {
+  --card-width: 240px;
+  --card-gap: 18px;
+  --card-max: 6;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 32px;
+}
+
+.carousel-nav {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: 1px solid rgba(138, 203, 255, 0.4);
+  background: rgba(12, 14, 28, 0.8);
+  color: #e6ebff;
+  font-size: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.carousel-nav:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 12px rgba(79, 92, 255, 0.4);
+}
+
+.carousel-nav:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  box-shadow: none;
 }
 
 .card-header {
