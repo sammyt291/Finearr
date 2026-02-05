@@ -1,0 +1,30 @@
+{
+  "port": 5000,
+  "ssl": {
+    "enabled": false,
+    "keyPath": "./certs/key.pem",
+    "certPath": "./certs/cert.pem",
+    "caPath": ""
+  },
+  "plex": {
+    "clientId": "finearr-web",
+    "authBaseUrl": "https://plex.tv",
+    "validateUrl": "https://plex.tv/api/v2/user",
+    "tokenHeader": "X-Plex-Token"
+  },
+  "omdb": {
+    "apiKey": ""
+  },
+  "tvdb": {
+    "apiKey": ""
+  },
+  "radarr": {
+    "baseUrl": "",
+    "apiKey": ""
+  },
+  "sonarr": {
+    "baseUrl": "",
+    "apiKey": ""
+  },
+  "defaultBackground": "https://images.unsplash.com/photo-1440404653325-ab127d49abc1?auto=format&fit=crop&w=1920&q=80"
+}
