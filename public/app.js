@@ -2,6 +2,7 @@ const state = {
   sessionToken: localStorage.getItem('finearrSession'),
   user: null,
   admin: null,
+  adminToken: null,
   permissions: null,
   approvals: [],
   requests: { movies: [], shows: [] },
@@ -16,6 +17,8 @@ const views = {
 };
 
 const navButtons = document.querySelectorAll('.nav-item');
+const adminNav = document.querySelector('.nav-item[data-view="admin"]');
+const requestsNav = document.querySelector('.nav-item[data-view="requests"]');
 const plexLogin = document.getElementById('plexLogin');
 const plexLoginLanding = document.getElementById('plexLoginLanding');
 const adminLogin = document.getElementById('adminLogin');
@@ -60,6 +63,10 @@ function setLoginButtonsDisabled(isDisabled) {
 }
 
 function setActiveView(viewName) {
+  if ((viewName === 'admin' || viewName === 'requests') && !state.adminToken) {
+    setActiveView('home');
+    return;
+  }
   Object.values(views).forEach((view) => view.classList.remove('active'));
   views[viewName].classList.add('active');
   navButtons.forEach((button) => {
@@ -73,6 +80,39 @@ navButtons.forEach((button) => {
 
 function renderProfile() {
   profile.textContent = state.user ? `Signed in as ${state.user.username}` : 'Not logged in';
+}
+
+function setAdminVisibility(isAdmin) {
+  if (adminNav) {
+    adminNav.style.display = isAdmin ? 'inline-flex' : 'none';
+  }
+  if (requestsNav) {
+    requestsNav.style.display = isAdmin ? 'inline-flex' : 'none';
+  }
+  if (!isAdmin && (views.admin.classList.contains('active') || views.requests.classList.contains('active'))) {
+    setActiveView('home');
+  }
+}
+
+function clearAdminSession(message) {
+  state.admin = null;
+  state.adminToken = null;
+  setAdminVisibility(false);
+  if (message) {
+    alert(message);
+  }
+}
+
+async function fetchWithAdmin(url, options = {}) {
+  const headers = { ...(options.headers || {}) };
+  if (state.adminToken) {
+    headers['X-Admin-Token'] = state.adminToken;
+  }
+  const response = await fetch(url, { ...options, headers });
+  if (response.status === 401) {
+    clearAdminSession('Admin session expired. Please log in again.');
+  }
+  return response;
 }
 
 async function loadAppConfig() {
@@ -206,6 +246,8 @@ adminLogin.addEventListener('click', async () => {
     return;
   }
   state.admin = data.admin;
+  state.adminToken = data.token;
+  setAdminVisibility(true);
   await loadPermissions();
   await loadAdminAccounts();
   alert('Admin session started');
@@ -278,7 +320,9 @@ async function requestItem(item) {
 }
 
 async function loadPermissions() {
-  const response = await fetch('/api/permissions');
+  if (!state.adminToken) return;
+  const response = await fetchWithAdmin('/api/permissions');
+  if (!response.ok) return;
   state.permissions = await response.json();
   permMovies.checked = !!state.permissions.defaults.canRequestMovies;
   permShows.checked = !!state.permissions.defaults.canRequestShows;
@@ -314,8 +358,8 @@ function renderUserPermissions() {
 savePermissions.addEventListener('click', savePermissionChanges);
 
 async function savePermissionChanges() {
-  if (!state.permissions) return;
-  const response = await fetch('/api/permissions', {
+  if (!state.permissions || !state.adminToken) return;
+  const response = await fetchWithAdmin('/api/permissions', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -327,12 +371,15 @@ async function savePermissionChanges() {
       users: state.permissions.users
     })
   });
+  if (!response.ok) return;
   state.permissions = await response.json();
   renderUserPermissions();
 }
 
 async function loadAdminAccounts() {
-  const response = await fetch('/api/admin/accounts');
+  if (!state.adminToken) return;
+  const response = await fetchWithAdmin('/api/admin/accounts');
+  if (!response.ok) return;
   const data = await response.json();
   adminList.innerHTML = '';
   data.admins.forEach((admin) => {
@@ -346,7 +393,7 @@ async function loadAdminAccounts() {
     div.querySelector('[data-user]').addEventListener('click', async () => {
       const newPassword = prompt('New password');
       if (!newPassword) return;
-      await fetch(`/api/admin/accounts/${admin.username}`, {
+      await fetchWithAdmin(`/api/admin/accounts/${admin.username}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password: newPassword })
@@ -355,7 +402,7 @@ async function loadAdminAccounts() {
     });
     if (admin.username !== 'admin') {
       div.querySelector('[data-delete]').addEventListener('click', async () => {
-        await fetch(`/api/admin/accounts/${admin.username}`, { method: 'DELETE' });
+        await fetchWithAdmin(`/api/admin/accounts/${admin.username}`, { method: 'DELETE' });
         await loadAdminAccounts();
       });
     }
@@ -364,21 +411,25 @@ async function loadAdminAccounts() {
 }
 
 createAdmin.addEventListener('click', async () => {
+  if (!state.adminToken) return;
   const username = newAdminUser.value.trim();
   const password = newAdminPass.value.trim();
   if (!username || !password) return;
-  await fetch('/api/admin/accounts', {
+  const response = await fetchWithAdmin('/api/admin/accounts', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password })
   });
+  if (!response.ok) return;
   newAdminUser.value = '';
   newAdminPass.value = '';
   await loadAdminAccounts();
 });
 
 async function loadRequests() {
-  const response = await fetch('/api/requests');
+  if (!state.adminToken) return;
+  const response = await fetchWithAdmin('/api/requests');
+  if (!response.ok) return;
   const data = await response.json();
   state.requests = data.requests;
   state.blacklist = data.blacklist;
@@ -408,12 +459,12 @@ function renderRequestItem(entry, type, container) {
     </div>
   `;
   div.querySelector('[data-approve]').addEventListener('click', async () => {
-    await fetch(`/api/requests/${type}/${entry.id}/approve`, { method: 'POST' });
+    await fetchWithAdmin(`/api/requests/${type}/${entry.id}/approve`, { method: 'POST' });
     await loadRequests();
     await loadHome();
   });
   div.querySelector('[data-deny]').addEventListener('click', async () => {
-    await fetch(`/api/requests/${type}/${entry.id}/deny`, { method: 'POST' });
+    await fetchWithAdmin(`/api/requests/${type}/${entry.id}/deny`, { method: 'POST' });
     await loadRequests();
   });
   container.appendChild(div);
@@ -434,7 +485,7 @@ function renderBlacklist() {
     `;
     div.querySelector('button').addEventListener('click', async () => {
       const type = entry.type || (state.blacklist.movies.some((item) => item.id === entry.id) ? 'movie' : 'show');
-      await fetch(`/api/blacklist/${type}/${entry.id}`, { method: 'DELETE' });
+      await fetchWithAdmin(`/api/blacklist/${type}/${entry.id}`, { method: 'DELETE' });
       await loadRequests();
     });
     blacklistList.appendChild(div);
@@ -461,6 +512,7 @@ document.querySelectorAll('.tab').forEach((tab) => {
 
 (async function init() {
   showLoginScreen(true);
+  setAdminVisibility(false);
   await loadAppConfig();
   const loggedIn = await autoLogin();
   if (!loggedIn) {
