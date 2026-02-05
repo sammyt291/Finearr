@@ -12,6 +12,50 @@ body {
     linear-gradient(135deg, rgba(10, 11, 20, 0.9), rgba(4, 6, 12, 0.95));
 }
 
+.app.hidden {
+  display: none;
+}
+
+.login-screen {
+  min-height: 100vh;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+}
+
+.login-screen.active {
+  display: flex;
+}
+
+.login-card {
+  background: rgba(9, 10, 18, 0.95);
+  border: 1px solid rgba(107, 139, 255, 0.2);
+  border-radius: 20px;
+  padding: 40px;
+  max-width: 420px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 0 24px rgba(80, 110, 255, 0.35);
+}
+
+.login-card h1 {
+  margin-top: 16px;
+  margin-bottom: 12px;
+}
+
+.login-card p {
+  margin-bottom: 20px;
+  color: #c4c8dd;
+}
+
+.login-status {
+  margin-top: 12px;
+  font-size: 13px;
+  color: #9ad0ff;
+  min-height: 18px;
+}
+
 .app {
   display: grid;
   grid-template-columns: 240px 1fr;

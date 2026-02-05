@@ -55,6 +55,16 @@ async function saveData(name, value) {
   await writeJson(file, value);
 }
 
+function buildPlexHeaders(config) {
+  return {
+    'X-Plex-Client-Identifier': config.plex.clientId,
+    'X-Plex-Product': 'Finearr',
+    'X-Plex-Version': '1.0',
+    'X-Plex-Device': 'Web',
+    'X-Plex-Platform': 'Web'
+  };
+}
+
 function createApp(state) {
   const app = express();
   app.use(express.json());
@@ -92,6 +102,44 @@ function createApp(state) {
       res.json({ sessionToken, user: users[userInfo.id] });
     } catch (error) {
       res.status(500).json({ error: 'Failed to validate Plex token' });
+    }
+  });
+
+  app.post('/api/auth/plex/pin', async (_req, res) => {
+    const config = await loadConfig();
+    try {
+      const response = await fetch(`${config.plex.authBaseUrl}/api/v2/pins?strong=true`, {
+        method: 'POST',
+        headers: buildPlexHeaders(config)
+      });
+      if (!response.ok) {
+        return res.status(500).json({ error: 'Unable to create Plex PIN' });
+      }
+      const data = await response.json();
+      const authBase = config.plex.authUrl || 'https://app.plex.tv/auth#';
+      const authUrl = `${authBase}?clientID=${encodeURIComponent(
+        config.plex.clientId
+      )}&code=${encodeURIComponent(data.code)}&context[device][product]=Finearr&context[device][deviceName]=Finearr&context[device][platform]=Web&context[device][platformVersion]=1.0&context[device][model]=Web&context[device][version]=1.0`;
+      res.json({ id: data.id, code: data.code, authUrl, expiresIn: data.expiresIn });
+    } catch (error) {
+      res.status(500).json({ error: 'Unable to create Plex PIN' });
+    }
+  });
+
+  app.get('/api/auth/plex/pin/:id', async (req, res) => {
+    const { id } = req.params;
+    const config = await loadConfig();
+    try {
+      const response = await fetch(`${config.plex.authBaseUrl}/api/v2/pins/${id}`, {
+        headers: buildPlexHeaders(config)
+      });
+      if (!response.ok) {
+        return res.status(500).json({ error: 'Unable to check Plex PIN' });
+      }
+      const data = await response.json();
+      res.json({ authToken: data.authToken || null, expiresIn: data.expiresIn, id: data.id });
+    } catch (error) {
+      res.status(500).json({ error: 'Unable to check Plex PIN' });
     }
   });
 
@@ -306,6 +354,7 @@ async function validatePlexToken(config, plexToken) {
   const response = await fetch(config.plex.validateUrl, {
     headers: {
       [config.plex.tokenHeader]: plexToken,
+      ...buildPlexHeaders(config),
       Accept: 'application/json'
     }
   });
