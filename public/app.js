@@ -26,6 +26,12 @@ const requestsNav = document.querySelector('.nav-item[data-view="requests"]');
 const plexLogin = document.getElementById('plexLogin');
 const plexLoginLanding = document.getElementById('plexLoginLanding');
 const adminLogin = document.getElementById('adminLogin');
+const adminModal = document.getElementById('adminModal');
+const adminModalClose = document.getElementById('adminModalClose');
+const adminModalCancel = document.getElementById('adminModalCancel');
+const adminLoginForm = document.getElementById('adminLoginForm');
+const adminUsername = document.getElementById('adminUsername');
+const adminPassword = document.getElementById('adminPassword');
 const searchButton = document.getElementById('searchButton');
 const searchInput = document.getElementById('searchInput');
 const resultsList = document.getElementById('resultsList');
@@ -109,6 +115,16 @@ function setLoginStatus(message) {
   loginStatus.textContent = message || '';
 }
 
+function updatePlexLoginButtons() {
+  const label = state.user ? 'Logout' : 'Login with Plex';
+  plexLogin.textContent = label;
+  plexLoginLanding.textContent = label;
+}
+
+function updateAdminLoginButton() {
+  adminLogin.textContent = state.adminToken ? 'Admin Logout' : 'Admin Login';
+}
+
 function setLoginButtonsDisabled(isDisabled) {
   plexLogin.disabled = isDisabled;
   plexLoginLanding.disabled = isDisabled;
@@ -150,6 +166,7 @@ function clearAdminSession(message) {
   state.admin = null;
   state.adminToken = null;
   setAdminVisibility(false);
+  updateAdminLoginButton();
   if (message) {
     alert(message);
   }
@@ -210,6 +227,7 @@ async function autoLogin() {
   state.user = data.user;
   renderProfile();
   applyLoginBackground();
+  updatePlexLoginButtons();
   return true;
 }
 
@@ -229,6 +247,7 @@ async function completePlexLogin(plexToken) {
   localStorage.setItem('finearrSession', state.sessionToken);
   renderProfile();
   applyLoginBackground();
+  updatePlexLoginButtons();
   showLoginScreen(false);
   await loadHome();
   await loadRequests();
@@ -280,12 +299,65 @@ async function startPlexOAuth() {
   }
 }
 
-plexLogin.addEventListener('click', startPlexOAuth);
-plexLoginLanding.addEventListener('click', startPlexOAuth);
+function openAdminModal() {
+  adminModal.classList.add('active');
+  adminModal.setAttribute('aria-hidden', 'false');
+  adminUsername.focus();
+}
 
-adminLogin.addEventListener('click', async () => {
-  const username = prompt('Admin username');
-  const password = prompt('Admin password');
+function closeAdminModal() {
+  adminModal.classList.remove('active');
+  adminModal.setAttribute('aria-hidden', 'true');
+  adminLoginForm.reset();
+}
+
+function logoutUser() {
+  state.sessionToken = null;
+  state.user = null;
+  localStorage.removeItem('finearrSession');
+  renderProfile();
+  updatePlexLoginButtons();
+  clearAdminSession();
+  showLoginScreen(true);
+  setActiveView('home');
+}
+
+plexLogin.addEventListener('click', () => {
+  if (state.user) {
+    logoutUser();
+    return;
+  }
+  startPlexOAuth();
+});
+
+plexLoginLanding.addEventListener('click', () => {
+  if (state.user) {
+    logoutUser();
+    return;
+  }
+  startPlexOAuth();
+});
+
+adminLogin.addEventListener('click', () => {
+  if (state.adminToken) {
+    clearAdminSession('Admin signed out.');
+    return;
+  }
+  openAdminModal();
+});
+
+adminModalClose.addEventListener('click', closeAdminModal);
+adminModalCancel.addEventListener('click', closeAdminModal);
+adminModal.addEventListener('click', (event) => {
+  if (event.target === adminModal) {
+    closeAdminModal();
+  }
+});
+
+adminLoginForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const username = adminUsername.value.trim();
+  const password = adminPassword.value;
   if (!username || !password) return;
   const response = await fetch('/api/auth/admin/login', {
     method: 'POST',
@@ -300,6 +372,8 @@ adminLogin.addEventListener('click', async () => {
   state.admin = data.admin;
   state.adminToken = data.token;
   setAdminVisibility(true);
+  updateAdminLoginButton();
+  closeAdminModal();
   await loadPermissions();
   await loadAdminAccounts();
   alert('Admin session started');
@@ -623,6 +697,8 @@ document.querySelectorAll('.tab').forEach((tab) => {
 (async function init() {
   showLoginScreen(true);
   setAdminVisibility(false);
+  updatePlexLoginButtons();
+  updateAdminLoginButton();
   await loadAppConfig();
   const loggedIn = await autoLogin();
   if (!loggedIn) {

@@ -33,7 +33,7 @@
       <main class="content">
         <header class="top-bar">
           <div class="search-wrapper" id="searchWrapper">
-            <input id="searchInput" type="text" placeholder="Search movies or TV shows" />
+            <input id="searchInput" type="finearr-text" placeholder="Search movies or TV shows" />
             <button id="searchButton" class="glow">Search</button>
           </div>
           <div class="profile" id="profile"></div>
@@ -62,7 +62,7 @@
               </div>
             </div>
             <h2>Blacklist</h2>
-            <input id="blacklistSearch" type="text" placeholder="Search blacklist" />
+            <input id="blacklistSearch" type="finearr-text" placeholder="Search blacklist" />
             <div id="blacklistList" class="request-list"></div>
           </div>
           <div id="adminView" class="view">
@@ -84,7 +84,7 @@
             <div class="tab-content" id="adminsTab">
               <h2>Admin Accounts</h2>
               <div class="admin-form">
-                <input id="newAdminUser" type="text" placeholder="Username" />
+                <input id="newAdminUser" type="finearr-text" placeholder="Username" />
                 <input id="newAdminPass" type="password" placeholder="Password" />
                 <button id="createAdmin" class="glow">Create Admin</button>
               </div>
@@ -93,6 +93,28 @@
           </div>
         </section>
       </main>
+    </div>
+    <div class="modal-backdrop" id="adminModal" aria-hidden="true">
+      <div class="modal">
+        <div class="modal-header">
+          <h2>Admin Login</h2>
+          <button class="secondary modal-close" id="adminModalClose" type="button">Close</button>
+        </div>
+        <form class="modal-body" id="adminLoginForm">
+          <label>
+            Username
+            <input id="adminUsername" type="finearr-text" placeholder="Admin username" autocomplete="off" />
+          </label>
+          <label>
+            Password
+            <input id="adminPassword" type="password" placeholder="Admin password" autocomplete="new-password" />
+          </label>
+          <div class="modal-actions">
+            <button class="glow" type="submit">Login</button>
+            <button class="secondary" type="button" id="adminModalCancel">Cancel</button>
+          </div>
+        </form>
+      </div>
     </div>
     <script src="app.js"></script>
   </body>
