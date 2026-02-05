@@ -415,16 +415,40 @@ async function searchImdb(query) {
   };
 }
 
+function extractPlotText(plot) {
+  if (!plot) {
+    return null;
+  }
+  if (typeof plot === 'string') {
+    return plot;
+  }
+  if (typeof plot === 'object') {
+    return (
+      plot.plotText?.plainText ||
+      plot.plotText?.text ||
+      plot.summary?.text ||
+      plot.summary?.plainText ||
+      plot.outline?.text ||
+      plot.outline?.plainText ||
+      plot.text ||
+      plot.plainText ||
+      null
+    );
+  }
+  return null;
+}
+
 async function buildImdbResults(titles, type) {
   return Promise.all(
     titles.map(async (title) => {
       const actors = await fetchImdbActors(title.id);
+      const plotText = extractPlotText(title.plot);
       return {
         id: title.id,
         title: title.primaryTitle || title.originalTitle,
         year: title.startYear,
         poster: title.primaryImage?.url,
-        plot: title.plot,
+        plot: plotText,
         actors,
         imdb: title.id ? `https://www.imdb.com/title/${title.id}` : null,
         type
