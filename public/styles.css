@@ -22,6 +22,10 @@ body {
   align-items: center;
   justify-content: center;
   padding: 32px;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-blend-mode: multiply;
 }
 
 .login-screen.active {
@@ -29,6 +33,7 @@ body {
 }
 
 .login-card {
+  position: relative;
   background: rgba(9, 10, 18, 0.95);
   border: 1px solid rgba(107, 139, 255, 0.2);
   border-radius: 20px;

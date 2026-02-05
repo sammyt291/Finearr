@@ -80,7 +80,8 @@ function createApp(state) {
     const config = await loadConfig();
     res.json({
       port: config.port,
-      defaultBackground: config.defaultBackground
+      defaultBackground: config.defaultBackground,
+      backgroundOverlayOpacity: config.backgroundOverlayOpacity
     });
   });
 
