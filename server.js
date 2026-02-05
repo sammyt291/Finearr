@@ -12,6 +12,7 @@ const __dirname = path.dirname(__filename);
 
 const configPath = path.join(__dirname, 'config.json');
 const dataDir = path.join(__dirname, 'data');
+const imdbCachePath = path.join(dataDir, 'imdb-cache.json');
 const imdbApiBaseUrl = 'https://api.imdbapi.dev';
 
 const defaults = {
@@ -42,6 +43,34 @@ async function writeJson(file, data) {
 
 async function loadConfig() {
   return readJson(configPath, {});
+}
+
+let imdbCache = null;
+
+async function loadImdbCache() {
+  if (!imdbCache) {
+    imdbCache = await readJson(imdbCachePath, {});
+  }
+  return imdbCache;
+}
+
+async function saveImdbCache() {
+  if (imdbCache) {
+    await writeJson(imdbCachePath, imdbCache);
+  }
+}
+
+async function getImdbCacheTtlMs() {
+  const config = await loadConfig();
+  const ttlDays = Number(config.imdbCacheTtlDays);
+  if (Number.isFinite(ttlDays) && ttlDays > 0) {
+    return ttlDays * 24 * 60 * 60 * 1000;
+  }
+  return 30 * 24 * 60 * 60 * 1000;
+}
+
+function buildImdbCacheKey(pathname) {
+  return pathname;
 }
 
 async function loadData(name) {
@@ -441,16 +470,18 @@ function extractPlotText(plot) {
 async function buildImdbResults(titles, type) {
   return Promise.all(
     titles.map(async (title) => {
+      const details = title.id ? await fetchImdbTitle(title.id) : null;
+      const source = details || title;
       const actors = await fetchImdbActors(title.id);
-      const plotText = extractPlotText(title.plot);
+      const plotText = extractPlotText(source.plot);
       return {
-        id: title.id,
-        title: title.primaryTitle || title.originalTitle,
-        year: title.startYear,
-        poster: title.primaryImage?.url,
+        id: source.id,
+        title: source.primaryTitle || source.originalTitle,
+        year: source.startYear,
+        poster: source.primaryImage?.url,
         plot: plotText,
         actors,
-        imdb: title.id ? `https://www.imdb.com/title/${title.id}` : null,
+        imdb: source.id ? `https://www.imdb.com/title/${source.id}` : null,
         type
       };
     })
@@ -470,15 +501,37 @@ async function fetchImdbActors(titleId) {
     .slice(0, 5);
 }
 
+async function fetchImdbTitle(titleId) {
+  if (!titleId) {
+    return null;
+  }
+  const data = await fetchImdbApi(`/titles/${encodeURIComponent(titleId)}`);
+  return data || null;
+}
+
 async function fetchImdbApi(pathname) {
   try {
+    const cache = await loadImdbCache();
+    const cacheKey = buildImdbCacheKey(pathname);
+    const ttlMs = await getImdbCacheTtlMs();
+    const cached = cache?.[cacheKey];
+    if (cached && cached.data && typeof cached.savedAt === 'number') {
+      if (Date.now() - cached.savedAt < ttlMs) {
+        return cached.data;
+      }
+    }
     const response = await fetch(`${imdbApiBaseUrl}${pathname}`, {
       headers: { Accept: 'application/json' }
     });
     if (!response.ok) {
       return null;
     }
-    return await response.json();
+    const data = await response.json();
+    if (cache) {
+      cache[cacheKey] = { savedAt: Date.now(), data };
+      await saveImdbCache();
+    }
+    return data;
   } catch (error) {
     return null;
   }

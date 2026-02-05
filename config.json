@@ -19,6 +19,7 @@
   "tvdb": {
     "apiKey": ""
   },
+  "imdbCacheTtlDays": 30,
   "radarr": {
     "baseUrl": "https://localhost:7878/",
     "apiKey": ""
