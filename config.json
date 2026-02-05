@@ -9,6 +9,7 @@
   "plex": {
     "clientId": "finearr-web",
     "authBaseUrl": "https://plex.tv",
+    "authUrl": "https://app.plex.tv/auth#",
     "validateUrl": "https://plex.tv/api/v2/user",
     "tokenHeader": "X-Plex-Token"
   },

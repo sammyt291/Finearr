@@ -17,6 +17,7 @@ const views = {
 
 const navButtons = document.querySelectorAll('.nav-item');
 const plexLogin = document.getElementById('plexLogin');
+const plexLoginLanding = document.getElementById('plexLoginLanding');
 const adminLogin = document.getElementById('adminLogin');
 const searchButton = document.getElementById('searchButton');
 const searchInput = document.getElementById('searchInput');
@@ -28,6 +29,9 @@ const showRequests = document.getElementById('showRequests');
 const blacklistList = document.getElementById('blacklistList');
 const blacklistSearch = document.getElementById('blacklistSearch');
 const profile = document.getElementById('profile');
+const appRoot = document.getElementById('app');
+const loginScreen = document.getElementById('loginScreen');
+const loginStatus = document.getElementById('loginStatus');
 
 const permMovies = document.getElementById('permMovies');
 const permShows = document.getElementById('permShows');
@@ -38,6 +42,20 @@ const adminList = document.getElementById('adminList');
 const newAdminUser = document.getElementById('newAdminUser');
 const newAdminPass = document.getElementById('newAdminPass');
 const createAdmin = document.getElementById('createAdmin');
+
+function showLoginScreen(shouldShow) {
+  loginScreen.classList.toggle('active', shouldShow);
+  appRoot.classList.toggle('hidden', shouldShow);
+}
+
+function setLoginStatus(message) {
+  loginStatus.textContent = message || '';
+}
+
+function setLoginButtonsDisabled(isDisabled) {
+  plexLogin.disabled = isDisabled;
+  plexLoginLanding.disabled = isDisabled;
+}
 
 function setActiveView(viewName) {
   Object.values(views).forEach((view) => view.classList.remove('active'));
@@ -56,7 +74,7 @@ function renderProfile() {
 }
 
 async function autoLogin() {
-  if (!state.sessionToken) return;
+  if (!state.sessionToken) return false;
   const response = await fetch('/api/auth/plex/auto', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -65,17 +83,18 @@ async function autoLogin() {
   if (!response.ok) {
     localStorage.removeItem('finearrSession');
     state.sessionToken = null;
-    return;
+    state.user = null;
+    renderProfile();
+    return false;
   }
   const data = await response.json();
   state.user = data.user;
   renderProfile();
   applyBackground();
+  return true;
 }
 
-plexLogin.addEventListener('click', async () => {
-  const plexToken = prompt('Enter your Plex token');
-  if (!plexToken) return;
+async function completePlexLogin(plexToken) {
   const response = await fetch('/api/auth/plex/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -91,7 +110,59 @@ plexLogin.addEventListener('click', async () => {
   localStorage.setItem('finearrSession', state.sessionToken);
   renderProfile();
   applyBackground();
-});
+  showLoginScreen(false);
+  await loadHome();
+  await loadRequests();
+}
+
+async function startPlexOAuth() {
+  try {
+    setLoginButtonsDisabled(true);
+    setLoginStatus('Opening Plex sign-in...');
+    const response = await fetch('/api/auth/plex/pin', { method: 'POST' });
+    const data = await response.json();
+    if (!response.ok) {
+      setLoginStatus(data.error || 'Unable to start Plex sign-in.');
+      return;
+    }
+    const popup = window.open(data.authUrl, '_blank', 'width=900,height=700');
+    setLoginStatus('Complete the login in the Plex window...');
+    const startedAt = Date.now();
+    const poll = setInterval(async () => {
+      if (Date.now() - startedAt > 2 * 60 * 1000) {
+        clearInterval(poll);
+        setLoginStatus('Login timed out. Please try again.');
+        setLoginButtonsDisabled(false);
+        return;
+      }
+      const pollResponse = await fetch(`/api/auth/plex/pin/${data.id}`);
+      const pollData = await pollResponse.json();
+      if (!pollResponse.ok) {
+        clearInterval(poll);
+        setLoginStatus(pollData.error || 'Unable to confirm Plex login.');
+        setLoginButtonsDisabled(false);
+        return;
+      }
+      if (!pollData.authToken) {
+        return;
+      }
+      clearInterval(poll);
+      if (popup) {
+        popup.close();
+      }
+      setLoginStatus('Signing you in...');
+      await completePlexLogin(pollData.authToken);
+      setLoginStatus('');
+      setLoginButtonsDisabled(false);
+    }, 3000);
+  } catch (error) {
+    setLoginStatus('Unable to start Plex sign-in.');
+    setLoginButtonsDisabled(false);
+  }
+}
+
+plexLogin.addEventListener('click', startPlexOAuth);
+plexLoginLanding.addEventListener('click', startPlexOAuth);
 
 adminLogin.addEventListener('click', async () => {
   const username = prompt('Admin username');
@@ -368,8 +439,13 @@ document.querySelectorAll('.tab').forEach((tab) => {
 });
 
 (async function init() {
-  await autoLogin();
-  renderProfile();
+  showLoginScreen(true);
+  const loggedIn = await autoLogin();
+  if (!loggedIn) {
+    renderProfile();
+    return;
+  }
+  showLoginScreen(false);
   await loadHome();
   await loadRequests();
 })();
