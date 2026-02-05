@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Finearr</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app" id="app">
+      <aside class="sidebar">
+        <div class="brand">Finearr</div>
+        <nav>
+          <button class="nav-item active" data-view="home">Home</button>
+          <button class="nav-item" data-view="search">Search</button>
+          <button class="nav-item" data-view="requests">Requests</button>
+          <button class="nav-item" data-view="admin">Admin</button>
+        </nav>
+        <div class="user-box" id="userBox">
+          <button id="plexLogin" class="glow">Login with Plex</button>
+          <button id="adminLogin" class="secondary">Admin Login</button>
+        </div>
+      </aside>
+      <main class="content">
+        <header class="top-bar">
+          <div class="search-wrapper" id="searchWrapper">
+            <input id="searchInput" type="text" placeholder="Search movies or TV shows" />
+            <button id="searchButton" class="glow">Search</button>
+          </div>
+          <div class="profile" id="profile"></div>
+        </header>
+        <section id="viewContainer">
+          <div id="homeView" class="view active">
+            <h2>Fresh UK / US Releases</h2>
+            <div id="recentList" class="card-grid"></div>
+            <h2>Most Recent Approvals</h2>
+            <div id="approvalList" class="card-grid"></div>
+          </div>
+          <div id="searchView" class="view">
+            <h2>Search Results</h2>
+            <div id="resultsList" class="card-grid"></div>
+          </div>
+          <div id="requestsView" class="view">
+            <h2>Requests</h2>
+            <div class="request-columns">
+              <div>
+                <h3>Movies</h3>
+                <div id="movieRequests" class="request-list"></div>
+              </div>
+              <div>
+                <h3>TV Shows</h3>
+                <div id="showRequests" class="request-list"></div>
+              </div>
+            </div>
+            <h2>Blacklist</h2>
+            <input id="blacklistSearch" type="text" placeholder="Search blacklist" />
+            <div id="blacklistList" class="request-list"></div>
+          </div>
+          <div id="adminView" class="view">
+            <div class="tabs">
+              <button class="tab active" data-tab="permissions">Permissions</button>
+              <button class="tab" data-tab="admins">Admin Accounts</button>
+            </div>
+            <div class="tab-content active" id="permissionsTab">
+              <h2>Default Permissions</h2>
+              <div class="permissions-form">
+                <label><input type="checkbox" id="permMovies" /> Allow movie requests</label>
+                <label><input type="checkbox" id="permShows" /> Allow TV requests</label>
+                <label><input type="checkbox" id="permAuto" /> Auto-approve requests</label>
+                <button id="savePermissions" class="glow">Save</button>
+              </div>
+              <h3>Individual Overrides</h3>
+              <div id="userPermissions" class="request-list"></div>
+            </div>
+            <div class="tab-content" id="adminsTab">
+              <h2>Admin Accounts</h2>
+              <div class="admin-form">
+                <input id="newAdminUser" type="text" placeholder="Username" />
+                <input id="newAdminPass" type="password" placeholder="Password" />
+                <button id="createAdmin" class="glow">Create Admin</button>
+              </div>
+              <div id="adminList" class="request-list"></div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+    <script src="app.js"></script>
+  </body>
+</html>
