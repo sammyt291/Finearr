@@ -209,12 +209,13 @@ button {
   box-shadow: 0 0 18px rgba(79, 92, 255, 0.3);
   display: flex;
   flex-direction: column;
-  width: 240px;
+  width: 360px;
+  min-width: 360px;
   scroll-snap-align: start;
 }
 
 .carousel-shell {
-  --card-width: 240px;
+  --card-width: 360px;
   --card-gap: 18px;
   --card-max: 6;
   display: grid;
