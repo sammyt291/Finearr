@@ -347,6 +347,67 @@ button {
   color: #c4c8dd;
 }
 
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(6, 8, 18, 0.7);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+  padding: 24px;
+}
+
+.modal-backdrop.active {
+  display: flex;
+}
+
+.modal {
+  background: rgba(12, 14, 28, 0.95);
+  border: 1px solid rgba(138, 203, 255, 0.3);
+  border-radius: 16px;
+  padding: 20px 24px;
+  max-width: 420px;
+  width: 100%;
+  box-shadow: 0 0 24px rgba(79, 92, 255, 0.45);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.modal-body label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+  color: #c4c8dd;
+}
+
+.modal-body input {
+  background: rgba(16, 18, 30, 0.8);
+  border: 1px solid rgba(138, 203, 255, 0.4);
+  color: inherit;
+  padding: 10px 14px;
+  border-radius: 10px;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
 .status-badge {
   padding: 4px 8px;
   border-radius: 999px;
