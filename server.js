@@ -56,12 +56,18 @@ async function saveData(name, value) {
 }
 
 function buildPlexHeaders(config) {
+  const plexConfig = config?.plex ?? {};
+  const productName = plexConfig.productName || 'Finearr';
+  const deviceName = plexConfig.deviceName || 'Finearr';
   return {
-    'X-Plex-Client-Identifier': config.plex.clientId,
-    'X-Plex-Product': 'Finearr',
-    'X-Plex-Version': '1.0',
-    'X-Plex-Device': 'Web',
-    'X-Plex-Platform': 'Web'
+    Accept: 'application/json',
+    'X-Plex-Client-Identifier': plexConfig.clientId,
+    'X-Plex-Product': productName,
+    'X-Plex-Version': plexConfig.version || '1.0',
+    'X-Plex-Device': plexConfig.device || 'Web',
+    'X-Plex-Platform': plexConfig.platform || 'Web',
+    'X-Plex-Device-Name': deviceName,
+    'X-Plex-Platform-Version': plexConfig.platformVersion || '1.0'
   };
 }
 
@@ -107,6 +113,9 @@ function createApp(state) {
 
   app.post('/api/auth/plex/pin', async (_req, res) => {
     const config = await loadConfig();
+    if (!config.plex?.clientId) {
+      return res.status(500).json({ error: 'Missing Plex clientId in config' });
+    }
     try {
       const response = await fetch(`${config.plex.authBaseUrl}/api/v2/pins?strong=true`, {
         method: 'POST',
