@@ -33,6 +33,8 @@ const appRoot = document.getElementById('app');
 const loginScreen = document.getElementById('loginScreen');
 const loginStatus = document.getElementById('loginStatus');
 
+let appConfig = {};
+
 const permMovies = document.getElementById('permMovies');
 const permShows = document.getElementById('permShows');
 const permAuto = document.getElementById('permAuto');
@@ -73,6 +75,31 @@ function renderProfile() {
   profile.textContent = state.user ? `Signed in as ${state.user.username}` : 'Not logged in';
 }
 
+async function loadAppConfig() {
+  try {
+    const response = await fetch('/api/config');
+    if (!response.ok) {
+      return;
+    }
+    appConfig = await response.json();
+    applyLoginBackground();
+  } catch (error) {
+    // Ignore config fetch failures; fallback styling will apply.
+  }
+}
+
+function applyLoginBackground() {
+  const background = state.user?.background || appConfig.defaultBackground;
+  if (!background) {
+    return;
+  }
+  const rawOpacity = appConfig.backgroundOverlayOpacity;
+  const parsedOpacity = Number.isFinite(rawOpacity) ? rawOpacity : Number.parseFloat(rawOpacity);
+  const opacity = Number.isFinite(parsedOpacity) ? Math.min(Math.max(parsedOpacity, 0), 1) : 0.4;
+  loginScreen.style.setProperty('--login-overlay-opacity', opacity.toString());
+  loginScreen.style.backgroundImage = `linear-gradient(rgba(10, 11, 20, ${opacity}), rgba(10, 11, 20, ${opacity})), url('${background}')`;
+}
+
 async function autoLogin() {
   if (!state.sessionToken) return false;
   const response = await fetch('/api/auth/plex/auto', {
@@ -90,7 +117,7 @@ async function autoLogin() {
   const data = await response.json();
   state.user = data.user;
   renderProfile();
-  applyBackground();
+  applyLoginBackground();
   return true;
 }
 
@@ -109,7 +136,7 @@ async function completePlexLogin(plexToken) {
   state.user = data.user;
   localStorage.setItem('finearrSession', state.sessionToken);
   renderProfile();
-  applyBackground();
+  applyLoginBackground();
   showLoginScreen(false);
   await loadHome();
   await loadRequests();
@@ -423,12 +450,6 @@ async function loadHome() {
   renderCards(approvalList, data.approvals || []);
 }
 
-function applyBackground() {
-  if (state.user?.background) {
-    document.querySelector('.content').style.backgroundImage = `url('${state.user.background}')`;
-  }
-}
-
 document.querySelectorAll('.tab').forEach((tab) => {
   tab.addEventListener('click', () => {
     document.querySelectorAll('.tab').forEach((button) => button.classList.remove('active'));
@@ -440,6 +461,7 @@ document.querySelectorAll('.tab').forEach((tab) => {
 
 (async function init() {
   showLoginScreen(true);
+  await loadAppConfig();
   const loggedIn = await autoLogin();
   if (!loggedIn) {
     renderProfile();
